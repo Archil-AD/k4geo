@@ -56,7 +56,7 @@
          offset_phi="-pi+(pi/EndcapHCal_n_phi_modules)"/>
       <id>system:4,type:3,layer:6,row:11,theta:11,phi:10</id>
     </readout>
-    <readout name="HCalEndcapReadoutRowPhi">
+    <readout name="HCalEndcapReadoutPhiRow">
       <segmentation type="FCCSWHCalPhiRow_k4geo" 
          offset_z="HCalEndcap_min_z1+(HCalEndcap_max_z1-HCalEndcap_min_z1)*0.5 HCalEndcap_min_z2+(HCalEndcap_max_z2-HCalEndcap_min_z2)*0.5 HCalEndcap_min_z3+(HCalEndcap_max_z3-HCalEndcap_min_z3)*0.5" 
          width_z="248.5*2*mm 243.0*2*mm 770.5*2*mm"

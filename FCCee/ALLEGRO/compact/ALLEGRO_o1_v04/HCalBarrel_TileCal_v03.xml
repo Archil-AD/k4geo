@@ -57,7 +57,7 @@
          offset_phi="-pi+(pi/BarHCal_n_phi_modules)"/>
       <id>system:4,layer:5,row:9,theta:9,phi:10</id>
     </readout>
-    <readout name="HCalBarrelReadoutRowPhi">
+    <readout name="HCalBarrelReadoutPhiRow">
       <segmentation type="FCCSWHCalPhiRow_k4geo" 
          offset_z="0"
          width_z="2795.5*2*mm"
