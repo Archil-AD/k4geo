@@ -48,23 +48,19 @@ createSimpleCylinder(dd4hep::Detector& lcdd, xml_h e, dd4hep::SensitiveDetector 
 
   // Create caloData object
   auto caloData = new dd4hep::rec::LayeredCalorimeterData;
-  if(name=="MuonTaggerBarrel")
-    caloData->layoutType = dd4hep::rec::LayeredCalorimeterData::BarrelLayout;
-  else
-    caloData->layoutType = dd4hep::rec::LayeredCalorimeterData::EndcapLayout;
-  cylinderDet.addExtension<dd4hep::rec::LayeredCalorimeterData>(caloData);
-
   caloData->extent[0] = cylinderDim.rmin();
   caloData->extent[1] = cylinderDim.rmax();
   if(name=="MuonTaggerBarrel")
   {
     caloData->extent[2] = 0;
     caloData->extent[3] = cylinderDim.dz();
+    caloData->layoutType = dd4hep::rec::LayeredCalorimeterData::BarrelLayout;
   }
   else
   {
     caloData->extent[2] = zoff;
     caloData->extent[3] = zoff + cylinderDim.dz();
+    caloData->layoutType = dd4hep::rec::LayeredCalorimeterData::EndcapLayout;
   }
 
   dd4hep::rec::LayeredCalorimeterData::Layer caloLayer;
@@ -74,6 +70,7 @@ createSimpleCylinder(dd4hep::Detector& lcdd, xml_h e, dd4hep::SensitiveDetector 
   caloLayer.outer_thickness           = (cylinderDim.rmax() - cylinderDim.rmin()) / 2.0;
   caloData->layers.push_back(caloLayer);
 
+  cylinderDet.addExtension<dd4hep::rec::LayeredCalorimeterData>(caloData);
 
   // Set type flags
   dd4hep::xml::setDetectorTypeFlag(x_det, cylinderDet);
