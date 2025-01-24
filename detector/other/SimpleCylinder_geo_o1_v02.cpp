@@ -20,8 +20,18 @@ createSimpleCylinder(dd4hep::Detector& lcdd, xml_h e, dd4hep::SensitiveDetector 
 
   xml_comp_t cylinderDim(x_det.child(_U(dimensions)));
 
-  dd4hep::Tube cylinder(cylinderDim.rmin(), cylinderDim.rmax(), cylinderDim.dz(), cylinderDim.phi0(), cylinderDim.deltaphi());
+  // envelop shape used only for endcap
+  dd4hep::Tube envelopShape(cylinderDim.rmin(), cylinderDim.rmax(),
+                            (cylinderDim.z_offset()+cylinderDim.dz()),
+                            cylinderDim.phi0(), cylinderDim.deltaphi());
 
+  // envelop volume where we will place endcap cylinders
+  dd4hep::Volume envelopeVolume(x_det.nameStr() + "_envelopeVolume", envelopShape, lcdd.air());
+
+  // shape for barrel/endcap
+  dd4hep::Tube cylinder(cylinderDim.rmin(), cylinderDim.rmax(),cylinderDim.dz(), cylinderDim.phi0(), cylinderDim.deltaphi());
+
+  // barrel or endcap cylinder
   dd4hep::Volume cylinderVol(x_det.nameStr() + "_SimpleCylinder", cylinder, lcdd.material(cylinderDim.materialStr()));
 
   if (x_det.isSensitive()) {
@@ -45,19 +55,23 @@ createSimpleCylinder(dd4hep::Detector& lcdd, xml_h e, dd4hep::SensitiveDetector 
     double zoff = cylinderDim.z_offset();
     dd4hep::Position trans1(0., 0., -zoff);
     dd4hep::Position trans2(0., 0., zoff);
-    cylinderPhys1 = experimentalHall.placeVolume(cylinderVol, dd4hep::Transform3D(dd4hep::RotationZ(0.), trans1));
-    cylinderPhys2 = experimentalHall.placeVolume(cylinderVol, dd4hep::Transform3D(dd4hep::RotationZ(0.), trans2));
+    // place endcap cylinders into envelope volume
+    cylinderPhys1 = envelopeVolume.placeVolume(cylinderVol,dd4hep::Transform3D(dd4hep::RotationZ(0.), trans1));
+    cylinderPhys2 = envelopeVolume.placeVolume(cylinderVol,dd4hep::Transform3D(dd4hep::RotationZ(0.), trans2));
 
-    cylinderPhys1.addPhysVolID("system", x_det.id());
+    //cylinderPhys1.addPhysVolID("system", x_det.id());
     cylinderPhys1.addPhysVolID("subsystem", 0); // negative endcap
     cylinderPhys1.addPhysVolID("layer", 0);
 
-    cylinderPhys2.addPhysVolID("system", x_det.id());
-    cylinderPhys1.addPhysVolID("subsystem", 1); // positive endcap
+    //cylinderPhys2.addPhysVolID("system", x_det.id());
+    cylinderPhys2.addPhysVolID("subsystem", 1); // positive endcap
     cylinderPhys2.addPhysVolID("layer", 0);
 
-    cylinderDet.setPlacement(cylinderPhys1);
-    cylinderDet.setPlacement(cylinderPhys2);
+    // Place envelope volume into experimentalHall
+    dd4hep::PlacedVolume placedEndcap = experimentalHall.placeVolume(envelopeVolume);
+    placedEndcap.addPhysVolID("system", x_det.id());
+    cylinderDet.setPlacement(placedEndcap);
+    // FIXME! AD: maybe should be envelopeVolume instead of cylinderVol???
     cylinderDet.setVisAttributes(lcdd, x_det.visStr(), cylinderVol);
 
     caloData->extent[2] = zoff - cylinderDim.dz();
