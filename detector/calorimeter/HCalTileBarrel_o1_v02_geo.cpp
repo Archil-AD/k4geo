@@ -285,8 +285,11 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
     caloLayer.outer_nInteractionLengths = nInteractionLengths / 2.0;
     caloLayer.outer_thickness           = difference_bet_r1r2 / 2;
 
-    caloLayer.cellSize0 = 20 * dd4hep::mm; // should be updated from DDGeometryCreatorALLEGRO
-    caloLayer.cellSize1 = 20 * dd4hep::mm; // should be updated from DDGeometryCreatorALLEGRO
+//    caloLayer.cellSize0 = 18 * dd4hep::mm; // should be updated from DDGeometryCreatorALLEGRO
+//    caloLayer.cellSize1 = 2.*layerInnerRadii.at(idxLayer) * std::sin(M_PI/256.);
+
+    caloLayer.cellSize0 = 20 * dd4hep::mm;
+    caloLayer.cellSize1 = 20 * dd4hep::mm;
 
     caloData->layers.push_back(caloLayer);
   }
