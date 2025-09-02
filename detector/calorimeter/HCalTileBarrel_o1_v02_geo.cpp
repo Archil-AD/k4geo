@@ -1,4 +1,4 @@
-// DD4hep
+/// DD4hep
 #include "DD4hep/DetFactoryHelper.h"
 #include "DD4hep/Printout.h"
 #include "DDRec/MaterialManager.h"
@@ -324,6 +324,12 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
     caloLayer.outer_nInteractionLengths = nInteractionLengths / 2.0;
     caloLayer.outer_thickness = difference_bet_r1r2 / 2;
 
+    /*
+    // AD: cellSize0 and cellSize1 definition in PandoraPFA for rectangular shaped cells like the HCal is not
+    // the theta and phi, but the size along the z-axis and the size along the axis perpendicular to the cellSize0 and thickness.
+    // For phi-theta segmentation cellSize0 is different for every cell in a given layer, therefore a single value set from caloLayer.cellSize0
+    // would not work.
+    // A workaround is to use the segmentation class from DDMarlinPandora and retrieve (cellSize0,cellSize1) per cell based on the cellID.
     if (seg_phitheta) {
       // cells have all the same phi-theta nominal sizes, so can pass dummy cell ID (it is ignored)
       std::vector<double> cellSizeVector = seg_phitheta->cellDimensions(0);
@@ -346,6 +352,7 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
       caloLayer.cellSize0 = cellSizeZ;
       caloLayer.cellSize1 = cellSizePhi;
     }
+    */
     caloData->layers.push_back(caloLayer);
   }
 

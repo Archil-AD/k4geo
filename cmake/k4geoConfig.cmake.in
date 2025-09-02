@@ -3,6 +3,9 @@ set(k4geo_VERSION @k4geo_VERSION@)
 @PACKAGE_INIT@
 
 set_and_check(k4geo_CMAKE_DIR "@PACKAGE_CMAKE_INSTALL_CMAKEDIR@")
+set_and_check(k4geo_INCLUDE_DIRS "@k4geo_INCLUDE_DIRS@")
+set_and_check(k4geo_LIBRARIES "@k4geo_LIBRARIES@")
+set_and_check(detectorSegmentations_LIBRARIES "@detectorSegmentations_LIBRARIES@")
 
 include(CMakeFindDependencyMacro)
 

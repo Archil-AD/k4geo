@@ -200,12 +200,29 @@ namespace DDSegmentation {
      */
     inline void setFieldNamePhi(const std::string& fieldName) { m_phiID = fieldName; }
 
-    /** Returns a std::vector<double> of the cellDimensions of the given cell ID
-     *  in natural order of dimensions (phi, theta)
+    /** Returns a std::vector<double> of the cellDimensions of the given cell ID as required by PandoraPFA
+     *  cellSize0: cell size along the z-axis
+     *  cellSize1: cell size along the axis perpendicular to cellSize0 and thickness
+     *  FIXME: AD: definition of cellSize0 and cellSize1 should be different for Endcap. Current segmantation of Endcap would not work properly for Pandora.
      *  @param[in] cellID
-     *  return a std::vector of size 2 with the cellDimensions of the given cell ID (phi, theta)
+     *  return a std::vector of size 2 with the cellDimensions of the given cell ID (cellSize0, cellSize1)
      */
-    inline std::vector<double> cellDimensions(const CellID& /* id */) const { return {gridSizePhi(), gridSizeTheta()}; }
+    inline std::vector<double> cellDimensions(const CellID& cID) const {
+      float cellSize0 = 0.;
+      float cellSize1 = 0.;
+
+      if (m_radii.empty())
+        defineCellsInRZplan();
+      if (!m_radii.empty())
+      {
+        uint layer = _decoder->get(cID, m_layerID);
+        int thetaID = _decoder->get(cID, m_thetaID);
+
+        cellSize0 = fabs(m_cellEdges[layer][thetaID].second - m_cellEdges[layer][thetaID].first);
+        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi());
+      }
+      return {cellSize0, cellSize1};
+    }
 
   protected:
     /// determine the azimuthal angle phi based on the current cell ID

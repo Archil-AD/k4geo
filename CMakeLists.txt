@@ -185,6 +185,11 @@ INSTALL(EXPORT ${PROJECT_NAME}Targets
 
 include(CMakePackageConfigHelpers)
 
+set(k4geo_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")
+set(k4geo_LIBRARIES "${CMAKE_INSTALL_PREFIX}/lib/libk4geo.so")
+set(detectorSegmentations_LIBRARIES "${CMAKE_INSTALL_PREFIX}/lib/libdetectorSegmentations.so")
+
+
 configure_package_config_file(cmake/k4geoConfig.cmake.in ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_CMAKEDIR}/k4geoConfig.cmake
   PATH_VARS CMAKE_INSTALL_CMAKEDIR
   INSTALL_DESTINATION ${CMAKE_INSTALL_CMAKEDIR} )
