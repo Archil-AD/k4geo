@@ -261,7 +261,7 @@ namespace DDSegmentation {
        	uint layer = _decoder->get(cID, m_layerID);
 
         cellSize0 = m_gridSizeRow[layer] * m_dz_row;
-        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi());
+        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi()/2.);
       }
       return {cellSize0, cellSize1};
     }

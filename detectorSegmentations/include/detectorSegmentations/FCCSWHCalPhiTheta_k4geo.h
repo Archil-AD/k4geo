@@ -219,7 +219,7 @@ namespace DDSegmentation {
         int thetaID = _decoder->get(cID, m_thetaID);
 
         cellSize0 = fabs(m_cellEdges[layer][thetaID].second - m_cellEdges[layer][thetaID].first);
-        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi());
+        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi()/2.);
       }
       return {cellSize0, cellSize1};
     }
