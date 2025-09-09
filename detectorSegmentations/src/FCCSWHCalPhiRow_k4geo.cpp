@@ -1,5 +1,6 @@
 #include "detectorSegmentations/FCCSWHCalPhiRow_k4geo.h"
 #include "DD4hep/Printout.h"
+#include <numeric>
 
 namespace dd4hep {
 namespace DDSegmentation {
@@ -26,6 +27,7 @@ namespace DDSegmentation {
     registerIdentifier("identifier_phi", "Cell ID identifier for phi", m_phiID, "phi");
     registerIdentifier("identifier_row", "Cell ID identifier for row", m_rowID, "row");
     registerIdentifier("identifier_layer", "Cell ID identifier for layer", m_layerID, "layer");
+    registerIdentifier("identifier_pseudoLayer", "Cell ID identifier for pseudo-layer", m_pseudoLayerID, "pseudoLayer");
   }
 
   FCCSWHCalPhiRow_k4geo::FCCSWHCalPhiRow_k4geo(const BitFieldCoder* decoder) : Segmentation(decoder) {
@@ -47,6 +49,7 @@ namespace DDSegmentation {
     registerIdentifier("identifier_phi", "Cell ID identifier for phi", m_phiID, "phi");
     registerIdentifier("identifier_row", "Cell ID identifier for row", m_rowID, "row");
     registerIdentifier("identifier_layer", "Cell ID identifier for layer", m_layerID, "layer");
+    registerIdentifier("identifier_pseudoLayer", "Cell ID identifier for pseudo-layer", m_pseudoLayerID, "pseudoLayer");
   }
 
   /// determine the global position based on the cell ID
@@ -246,10 +249,52 @@ namespace DDSegmentation {
                   positionToBin(dd4hep::DDSegmentation::Util::phiFromXYZ(globalPosition), 2 * M_PI / (double)m_phiBins,
                                 m_offsetPhi));
 
-    // For endcap, the volume ID comes with "type" field information which would screw up the topo-clustering,
-    // therefore, lets set it to zero, as it is for the cell IDs in the neighbours map.
     if (m_detLayout == 1)
+    {
+      // For endcap, the volume ID comes with "type" field information which would screw up the topo-clustering,
+      // therefore, lets set it to zero, as it is for the cell IDs in the neighbours map.
       _decoder->set(cID, "type", 0);
+
+      // Determine pseudo-layer index.
+      // Pseudo-layer is defined as the vertical tower of rows/cells from different physical layers in a give section.
+      // This is passed to PandoraPFA as a longitudinal layer.
+      // NOTE: The pseudo-layer definition breaks down if different physical layers in a given section have different granularities.
+      // If in any of the sections the granularity is different between the layers, then will set pseudo-layer to 0 for all cells.
+      auto checkEqual = [](const std::vector<int> &v, size_t first, size_t last) {
+        if ( first>last || v.size() == 0 || v.size()<=last) return false;
+        for (size_t i = first+1; i <= last; ++i)
+        {
+          if (v[i] != v[first])  return false;
+        }
+	return true;
+      };
+
+      uint pseudoLayer = 0;
+      std::vector<std::pair<uint, uint>> minMaxLayerId(getMinMaxLayerId());
+      for (uint i_section = 0; i_section < minMaxLayerId.size(); i_section++) {
+        uint minLayerId = minMaxLayerId[i_section].first;
+        uint maxLayerId = minMaxLayerId[i_section].second;
+
+        // check if granularity is same between the layers in the i_section
+        if(!checkEqual(m_gridSizeRow, minLayerId, maxLayerId))
+        {
+          // Granularity is different between the layers in a given section -> pseudo-layers can not be defined.
+          // This could happen if doing a study without PandoraPFA.
+          _decoder->set(cID, m_pseudoLayerID, 0);
+          // AD: should we print a warning???
+          return cID;
+        }
+
+        // check if the given cell is in the i_section
+        if (layer >= minLayerId && layer <= maxLayerId) {
+          pseudoLayer += (abs(idx)-1);
+          _decoder->set(cID, m_pseudoLayerID, pseudoLayer);
+          break;
+        }
+        // if the cell is not in the i_section then start pseudoLayer from number of rows/cells in the i_section.
+        pseudoLayer+=(m_cellIndexes[minLayerId].size()/2); // m_cellIndexes contains cell indexes from both positive-z and negative-z endcaps, hence divide by 2.
+      }
+    }
 
     return cID;
   }

@@ -48,7 +48,7 @@
   </display>
 
   <readouts>
-    <readout name="HCalBarrelReadout">
+    <readout name="HCalBarrelReadoutPhiTheta">
       <!-- Description of the variables:
            detLayout - variable to determine if it's a Barrel(=0) or Endcap(=1).
            offset_z - middle position in z of the Barrel, which is zero.
@@ -77,7 +77,7 @@
          offset_phi="-pi+(pi/BarHCal_n_phi_modules)"/>
       <id>system:4,layer:5,row:9,theta:9,phi:10</id>
     </readout>
-    <readout name="HCalBarrelReadoutPhiRow">
+    <readout name="HCalBarrelReadout">
       <!-- Description of the variables:
            detLayout - variable to determine if it's a Barrel(=0) or Endcap(=1).
            offset_z - middle position in z of the Barrel, which is zero.
