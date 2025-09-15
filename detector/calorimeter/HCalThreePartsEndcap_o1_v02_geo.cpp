@@ -220,6 +220,7 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
     Volume endPlateVol3("endPlateVol3", endPlateShape3, lcdd.material(xEndPlate.materialStr()));
     endPlateVol3.setVisAttributes(lcdd, xEndPlate.visStr());
 
+    //FIXME: AD: why only two endplates are added? should be added on both sides of all sections
     // Endplates placed for the extended Barrels in front and in the back to the central Barrel
     DetElement endPlatePos(caloDetElem, "endPlate_" + std::to_string(1 * sign), 0);
     dd4hep::Position posOffset(0, 0, sign * (extBarrelOffset3 + dzDetector3 + dZEndPlate + space));
@@ -258,7 +259,7 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
                          idxLayer, rminLayer, rmaxLayer);
       }
 
-
+      // FIXME: layer shape should have the size of the sensitive part that is dzSequence*numSeq, while here dzDetector1 includes endplate+space.
       dd4hep::Tube layerShape(rminLayer, rmaxLayer, dzDetector1);
       Volume layerVolume("HCalECLayerVol1", layerShape, lcdd.air());
 
@@ -569,6 +570,7 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
       return true;
     };
     std::vector<int> gridSizeRowPerLayer(seg_phirow->gridSizeRow());
+    std::vector<int> groupedRows(seg_phirow->groupedRows());
     if(!checkEqual(gridSizeRowPerLayer,0,layerDepths1.size()-1))
       dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "Physical layers in the Endcap Part1 have different granularities.\n%s",
                                                                        "Pseudo-layer for PandoraPFA can not be defined.");
@@ -596,6 +598,13 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
        gridSizeRowPerLayer[firstLayerId[2]]  // grid size of first layer in part3
     };
 
+    if (!groupedRows.empty() && (groupedRows.size() % numSequences.size() != 0) )
+    {
+      dd4hep::printout(dd4hep::ERROR, "HCalThreePartsEndcap_o1_v02",
+                                      "Number of elements in groupedRows must be multiple of number of Endcap sections (numSequences.size())!");
+      throw std::runtime_error("Incorrect readout in calorimeter xml description!");
+    }
+
     int pseudoLayer = 0;
     std::vector<int> rowNumber;
     for(unsigned int i_section = 0; i_section < numSequences.size(); i_section++ )
@@ -606,6 +615,28 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
       {
         // get the cell index (start from 1!)
         int idx = floor(i_row / gridSize[i_section]) + 1;
+        double dzCell = (dzSequence * gridSize[i_section]);
+
+        // If groupedRows is provided from the xml file, then group the rows into the pseudo-layer cells
+        // according to the provided numbers by redefining the cell index (idx).
+        if (!groupedRows.empty())
+        {
+          unsigned int first = i_section * groupedRows.size()/numSequences.size();
+          unsigned int last = (i_section == numSequences.size()) ? numSequences.size() :
+                              first + groupedRows.size()/numSequences.size();
+          unsigned int nrows = 0;
+          for (unsigned int i = first; i < last; i++)
+          {
+            nrows += groupedRows[i];
+            if (i_row < nrows)
+            {
+              idx = (i+1) - first;
+              dzCell = (dzSequence * groupedRows[i]);
+              break;
+            }
+          }
+        }
+
         dd4hep::CellID cID;
         encoder.set(cID, layerFieldName, firstLayerId[i_section]);
         encoder.set(cID, rowFieldName, idx);
@@ -617,17 +648,18 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
           double ypos = seg_phirow->position(cID).y();
           double zpos = seg_phirow->position(cID).z();
           double radius = sqrt(xpos*xpos + ypos*ypos);
+
           dd4hep::rec::Vector3D ivr1 = dd4hep::rec::Vector3D(radius*cos(M_PI/512.), radius*sin(M_PI/512.),
-                                     zpos - 0.5 *(dzSequence * gridSize[i_section]) ); // defining starting vector points of the given layer
+                                     zpos - 0.5 * dzCell ); // defining starting vector points of the given layer
           dd4hep::rec::Vector3D ivr2 = dd4hep::rec::Vector3D(radius*cos(M_PI/512.), radius*sin(M_PI/512.),
-                                     zpos + 0.5 *(dzSequence * gridSize[i_section]) ); // defining end vector points of the given layer
+                                     zpos + 0.5 * dzCell ); // defining end vector points of the given layer
 
           const dd4hep::rec::MaterialVec& materials =
              matMgr.materialsBetween(ivr1, ivr2); // calling material manager to get material info between two points
           auto mat = matMgr.createAveragedMaterial(materials); // creating average of all the material between two points to
                                                          // calculate X0 and lambda of averaged material
-          const double nRadiationLengths = (dzSequence * gridSize[i_section]) / mat.radiationLength();
-          const double nInteractionLengths = (dzSequence * gridSize[i_section]) / mat.interactionLength();
+          const double nRadiationLengths =  dzCell / mat.radiationLength();
+          const double nInteractionLengths =  dzCell / mat.interactionLength();
           double thickness_sen = 0.;
           double absorberThickness = 0.;
 
@@ -642,22 +674,24 @@ static dd4hep::Ref_t createHCalEC(dd4hep::Detector& lcdd, xml_h xmlElement, dd4h
           }
 
           dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "  PseudoLayer %d", pseudoLayer);
+          dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    z-position is: %.2f cm", zpos);
+          dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    thickness along the z-axis is: %.2f cm", dzCell);
           dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    sensitive thickness is: %.2f cm", thickness_sen);
           dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    absorber thickness is: %.2f cm",  absorberThickness);
           dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    number of radiation length is: %.2f", nRadiationLengths);
           dd4hep::printout(dd4hep::INFO, "HCalThreePartsEndcap_o1_v02", "    number of interaction length is: %.2f", nInteractionLengths);
 
           caloLayer.distance = seg_phirow->position(cID).z();   // z-position of the pseudoLayer
-          caloLayer.sensitive_thickness = dzSequence * gridSize[i_section]; // dimension along the z-axis
+          caloLayer.sensitive_thickness = dzCell; // dimension along the z-axis
           //caloLayer.sensitive_thickness = thickness_sen;
           caloLayer.absorberThickness = absorberThickness;
 
-          caloLayer.inner_thickness = (dzSequence * gridSize[i_section]) / 2.0;
+          caloLayer.inner_thickness =  dzCell / 2.0;
           caloLayer.inner_nRadiationLengths = nRadiationLengths / 2.0;
           caloLayer.inner_nInteractionLengths = nInteractionLengths / 2.0;
           caloLayer.outer_nRadiationLengths = nRadiationLengths / 2.0;
           caloLayer.outer_nInteractionLengths = nInteractionLengths / 2.0;
-          caloLayer.outer_thickness = (dzSequence * gridSize[i_section]) / 2.0;
+          caloLayer.outer_thickness =  dzCell / 2.0;
 
           std::vector<double> cellSizeVector = seg_phirow->cellDimensions(cID);
           caloLayer.cellSize0 = cellSizeVector[0];

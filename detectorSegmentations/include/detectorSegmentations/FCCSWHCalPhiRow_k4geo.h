@@ -4,6 +4,7 @@
 #include "DDSegmentation/Segmentation.h"
 #include "DDSegmentation/SegmentationUtil.h"
 #include "TVector3.h"
+#include <span>
 
 /** FCCSWHCalPhiRow_k4geo Detector/detectorSegmentations/detectorSegmentations/FCCSWHCalPhiRow_k4geo.h
  * FCCSWHCalPhiRow_k4geo.h
@@ -135,6 +136,11 @@ namespace DDSegmentation {
      */
     std::vector<std::pair<uint, uint>> getMinMaxLayerId() const;
 
+    /** Get the section index from the layer index.
+     * This is used for the Endcap that consists of more than 1 section
+     */
+    uint layerToSection(const uint layer) const;
+
     /**  Get the coordinate offset in z-axis.
      *   Offset is the middle position of the Barrel or each section of the Endcap.
      *   For the Barrel, the vector size is 1, while for the Endcap - number of section.
@@ -166,6 +172,14 @@ namespace DDSegmentation {
      *   return the dR.
      */
     inline std::vector<double> dRlayer() const { return m_dRlayer; }
+
+
+    /**  Get the number of rows to be grouped in a pseudo-layer in the Endcap.
+     *   This is used only for the Endcap.
+     *   The vector size equals to the number of sections in the Endcap times the number of different
+     * thicknesses used to form the layers. return the number of layers.
+     */
+    inline std::vector<int> groupedRows() const { return m_groupedRows; }
 
     /**  Get the field name for azimuthal angle.
      *   return The field name for phi.
@@ -202,6 +216,11 @@ namespace DDSegmentation {
      *   @param[in] aCellSize Cell size in theta.
      */
     inline void setGridSizeRow(std::vector<int> const& size) { m_gridSizeRow = size; }
+
+    /**  Set the number of rows to be grouped in a pseudo-layer of the Endcap.
+     *   @param[in] aSize number of rows to be grouped.
+     */
+    inline void setGroupedRows(std::vector<int> const& size) { m_groupedRows = size; }
 
     /**  Set the detector layout (0 = Barrel; 1 = Endcap).
      *   @param[in] detLayout
@@ -279,6 +298,8 @@ namespace DDSegmentation {
     std::string m_pseudoLayerID;
     /// the grid size in row for each layer
     std::vector<int> m_gridSizeRow;
+    /// number of rows to be grouped in a pseudo-layer of the Endcap
+    std::vector<int> m_groupedRows;
     /// dz of row
     double m_dz_row;
     /// the field name used for row
@@ -295,6 +316,8 @@ namespace DDSegmentation {
     std::vector<int> m_numLayers;
     /// dR of the layer
     std::vector<double> m_dRlayer;
+    /// number of rows to be grouped in a pseudo-layer of each section of the Endcap
+    mutable std::vector<std::span<const int>> m_groupedRowsSpan;
     /// radius of each layer
     mutable std::vector<double> m_radii;
     /// z-min and z-max of each layer
