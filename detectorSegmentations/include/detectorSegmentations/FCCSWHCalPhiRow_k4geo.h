@@ -269,7 +269,7 @@ namespace DDSegmentation {
     /** Returns a std::vector<double> of the cellDimensions of the given cell ID as required by PandoraPFA
      *  cellSize0: cell size along the z-axis in BARREL, cell size in radial direction in ENDCAP
      *  cellSize1: cell size along the axis perpendicular to the cellSize0 and thickness
-     *  @param[in] cellID
+     *  @param[in] cID
      *  return a std::vector of size 2 with the cellDimensions of the given cell ID (cellSize0, cellSize1)
      */
     virtual std::vector<double> cellDimensions(const CellID& cID) const override {
@@ -280,9 +280,9 @@ namespace DDSegmentation {
         calculateLayerRadii();
       if (!m_radii.empty())
       {
-       	uint layer = _decoder->get(cID, m_layerID);
+       	uint layer = decoder()->get(cID, m_layerIndex);
 
-        cellSize0 = (m_detLayout == 0) ? m_gridSizeRow[layer] * m_dz_row : m_layerDepth[layer];
+        cellSize0 = (m_detLayout == 0) ? gridSizeRow()[layer] * m_dz_row : m_layerDepth[layer];
         cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi()/2.);
       }
 
