@@ -31,8 +31,10 @@ namespace DDSegmentation {
     registerIdentifier("identifier_phi", "Cell ID identifier for phi", m_phiID, "phi");
     registerIdentifier("identifier_row", "Cell ID identifier for row", m_rowID, "row");
     registerIdentifier("identifier_layer", "Cell ID identifier for layer", m_layerID, "layer");
+    registerIdentifier("identifier_pseudoLayer", "Cell ID identifier for pseudo-layer", m_pseudoLayerID, "pseudoLayer");
 
     m_layerIndex = decoder()->index(m_layerID);
+    m_pseudoLayerIndex = decoder()->index(m_pseudoLayerID);
     m_rowIndex = decoder()->index(m_rowID);
     m_phiIndex = decoder()->index(m_phiID);
 
@@ -48,6 +50,7 @@ namespace DDSegmentation {
   /// determine the global position based on the cell ID
   Vector3D FCCSWHCalPhiRow_k4geo::position(const CellID& cID) const {
     uint layer = decoder()->get(cID, m_layerIndex);
+    uint section = layerToSection(layer);
 
     if (m_radii.empty())
       calculateLayerRadii();
@@ -67,6 +70,17 @@ namespace DDSegmentation {
     // for negative-z Endcap, the index is negative (starts from -1!)
     if (idx < 0)
       zpos = -minLayerZ + (idx + 1) * m_dz_row * m_gridSizeRow[layer] - 0.5 * m_dz_row * m_gridSizeRow[layer];
+
+    // If this is the Endcap and m_groupedRows is provided from the xml file, then rows are grouped to the pseudo-layers.
+    // Need to recalculate the cell position:
+    if (m_detLayout == 1 && !m_groupedRows.empty())
+    {
+      int nrows = 0;
+      for (unsigned int i = 0; i < abs(idx); i++)
+        nrows += m_groupedRowsSpan[section][i];
+      zpos = minLayerZ + nrows * m_dz_row - 0.5 * m_groupedRowsSpan[section][abs(idx)-1] * m_dz_row;
+      if (idx < 0) zpos = -zpos;
+    }
 
     return Vector3D(radius * std::cos(phi(cID)), radius * std::sin(phi(cID)), zpos);
   }
@@ -122,6 +136,12 @@ namespace DDSegmentation {
                          "Number of elements in gridSizeRow must be equal to sum of contents of numLayers!");
         return;
       }
+      if (!m_groupedRows.empty() && (m_groupedRows.size() % m_offsetZ.size() != 0) ) {
+        dd4hep::printout(dd4hep::ERROR, "FCCSWHCalPhiRow_k4geo",
+                         "Please check the readout description in the XML file!\n%s",
+                         "Number of elements in grouped_rows must be multiple of offsetZ.size()!");
+        return;
+      }
 
       if (m_detLayout == 0)
         dd4hep::printout(dd4hep::INFO, "FCCSWHCalPhiRow_k4geo", "Barrel configuration found!");
@@ -155,6 +175,21 @@ namespace DDSegmentation {
       // allocate cellEdges vector for each layer
       m_cellEdges.resize(m_radii.size());
 
+      // If this is the Endcap and m_groupedRows is provided from the xml file, then rows should be grouped into the pseudo-layers.
+      // In the m_groupedRowsSpan we store the numbers for each section extracted from m_groupedRows vector provided from the xml file.
+      // The number of non-zero elements in m_groupedRowsSpan[i_section] corresponds to the number of pseudo-layers in i_section.
+      // Each non-zero element in m_groupedRowsSpan[i_section] corresponds to the number of rows form the physical layer of i_section
+      // to be grouped in a pseudo-layer.
+      if (m_detLayout == 1 && !m_groupedRows.empty())
+      {
+       	uint nGroupedRows = m_groupedRows.size()/m_offsetZ.size();
+        for (uint i_section = 0; i_section < m_offsetZ.size(); i_section++) {
+          auto start = m_groupedRows.begin() + i_section * nGroupedRows;
+          auto end = (i_section == m_offsetZ.size() - 1) ? m_groupedRows.end() : start + nGroupedRows;
+          m_groupedRowsSpan.push_back(std::span<const int>(std::to_address(start), std::to_address(end)));
+        }
+      }
+
       // determine row bins for each layer
       for (uint i_layer = 0; i_layer < m_radii.size(); i_layer++)
         defineCellIndexes(i_layer);
@@ -172,6 +207,8 @@ namespace DDSegmentation {
    */
   void FCCSWHCalPhiRow_k4geo::defineCellIndexes(const uint layer) const {
     if (m_cellIndexes[layer].size() == 0 && m_radii.size() > 0) {
+      uint section = layerToSection(layer);
+
       double minLayerZ = m_layerEdges[layer].first;
       double maxLayerZ = m_layerEdges[layer].second;
 
@@ -180,6 +217,23 @@ namespace DDSegmentation {
       while ((minLayerZ + (irow + 1) * m_dz_row) < (maxLayerZ + 0.0001)) {
         // define the cell index
         int idx = floor(irow / m_gridSizeRow[layer]) + 1;
+
+        // If this is Endcap and m_groupedRows is provided from the xml file, then group the rows into the pseudo-layer cells
+        // according to the provided numbers by redefining the cell index (idx).
+        if (m_detLayout == 1 && !m_groupedRows.empty())
+        {
+          int nrows = 0;
+          for(unsigned int i = 0; i < m_groupedRowsSpan[section].size(); i++)
+          {
+            nrows += m_groupedRowsSpan[section][i];
+            if (irow < nrows)
+            {
+              idx = (i+1);
+              break;
+            }
+          }
+        }
+
         // add the index if it is not already there
         if (std::find(m_cellIndexes[layer].begin(), m_cellIndexes[layer].end(), idx) == m_cellIndexes[layer].end())
           m_cellIndexes[layer].push_back(idx);
@@ -192,6 +246,19 @@ namespace DDSegmentation {
         while ((minLayerZ + (irow + 1) * m_dz_row) < (maxLayerZ + 0.0001)) {
           // define the cell index with negative sign
           int idx = -(floor(irow / m_gridSizeRow[layer]) + 1);
+          if (!m_groupedRows.empty())
+          {
+            int nrows = 0;
+            for(unsigned int i = 0; i < m_groupedRowsSpan[section].size(); i++)
+            {
+              nrows += m_groupedRowsSpan[section][i];
+              if (irow < nrows)
+              {
+                idx = -(i+1);
+                break;
+              }
+            }
+          }
           // add the index if it is not already there
           if (std::find(m_cellIndexes[layer].begin(), m_cellIndexes[layer].end(), idx) == m_cellIndexes[layer].end())
             m_cellIndexes[layer].push_back(idx);
@@ -227,11 +294,28 @@ namespace DDSegmentation {
     int nrow = decoder()->get(vID, m_rowIndex);
     // get the layer number from volumeID
     uint layer = decoder()->get(vID, m_layerIndex);
+    uint section = layerToSection(layer);
 
     CellID cID = vID;
 
     // get the cell index (start from 1!)
     int idx = floor(nrow / m_gridSizeRow[layer]) + 1;
+
+    // If this is Endcap and m_groupedRows is provided from the xml file, then group the rows into the pseudo-layer cells
+    // according to the provided numbers.
+    if (m_detLayout == 1 && !m_groupedRows.empty())
+    {
+      int nrows = 0;
+      for(unsigned int i = 0; i < m_groupedRowsSpan[section].size(); i++)
+      {
+        nrows += m_groupedRowsSpan[section][i];
+        if (nrow < nrows)
+        {
+          idx = (i+1);
+          break;
+        }
+      }
+    }
 
     // if the hit is in the negative-z part of the Endcap then assign negative index
     if (m_detLayout == 1 && globalPosition.z() < 0)
@@ -239,13 +323,56 @@ namespace DDSegmentation {
 
     decoder()->set(cID, m_rowIndex, idx);
     decoder()->set(cID, m_phiIndex,
-                   positionToBin(dd4hep::DDSegmentation::Util::phiFromXYZ(globalPosition), 2 * M_PI / (double)m_phiBins,
-                                 m_offsetPhi));
+                  positionToBin(dd4hep::DDSegmentation::Util::phiFromXYZ(globalPosition), 2 * M_PI / (double)m_phiBins,
+                                m_offsetPhi));
 
-    // For endcap, the volume ID comes with "type" field information which would screw up the topo-clustering,
-    // therefore, lets set it to zero, as it is for the cell IDs in the neighbours map.
     if (m_detLayout == 1)
+    {
+      // For endcap, the volume ID comes with "type" field information which would screw up the topo-clustering,
+      // therefore, lets set it to zero, as it is for the cell IDs in the neighbours map.
       decoder()->set(cID, m_typeIndex, 0);
+
+      // Determine pseudo-layer index.
+      // Pseudo-layer is defined as the vertical tower of rows/cells from different physical layers in a give section.
+      // This is passed to PandoraPFA as a longitudinal layer.
+      // NOTE: The pseudo-layer definition breaks down if different physical layers in a given section have different granularities.
+      // If in any of the sections the granularity is different between the layers, then will set pseudo-layer to 0 for all cells.
+      auto checkEqual = [](const std::vector<int> &v, size_t first, size_t last) {
+        if ( first>last || v.size() == 0 || v.size()<=last) return false;
+        for (size_t i = first+1; i <= last; ++i)
+        {
+          if (v[i] != v[first])  return false;
+        }
+	return true;
+      };
+
+      uint pseudoLayer = 0;
+      std::vector<std::pair<uint, uint>> minMaxLayerId(getMinMaxLayerId());
+      for (uint i_section = 0; i_section < minMaxLayerId.size(); i_section++) {
+        uint minLayerId = minMaxLayerId[i_section].first;
+        uint maxLayerId = minMaxLayerId[i_section].second;
+
+        // check if the granularity is same between the physical layers in the i_section.
+        // We need to check this only if m_groupedRows is empty. Othewise, pseudo-layers are defined according to m_groupedRows.
+        if (m_groupedRows.empty() && !checkEqual(m_gridSizeRow, minLayerId, maxLayerId))
+        {
+          // Granularity is different between the layers in a given section -> pseudo-layers can not be defined.
+          // This could happen if doing a study without PandoraPFA.
+          decoder()->set(cID, m_pseudoLayerIndex, 0);
+          return cID;
+        }
+
+        // check if the given cell is in the i_section
+        if (layer >= minLayerId && layer <= maxLayerId) {
+          pseudoLayer += (abs(idx)-1);
+          decoder()->set(cID, m_pseudoLayerIndex, pseudoLayer);
+          break;
+        }
+        // if the cell is not in the i_section then start pseudoLayer from number of rows/cells in the i_section.
+        pseudoLayer+=(m_cellIndexes[minLayerId].size()/2); // m_cellIndexes contains cell indexes from both positive- and negative-z endcaps,
+                                                           // hence divide the size by 2.
+      }
+    }
 
     return cID;
   }
@@ -254,6 +381,18 @@ namespace DDSegmentation {
   double FCCSWHCalPhiRow_k4geo::phi(const CellID cID) const {
     CellID phiValue = decoder()->get(cID, m_phiIndex);
     return binToPosition(phiValue, 2. * M_PI / (double)m_phiBins, m_offsetPhi);
+  }
+
+  /// Convert layer index to the section index
+  uint FCCSWHCalPhiRow_k4geo::layerToSection(const uint layer) const {
+    std::vector<std::pair<uint, uint>> minMaxLayerId(getMinMaxLayerId());
+    for (uint i_section = 0; i_section < minMaxLayerId.size(); i_section++) {
+      if (layer >= minMaxLayerId[i_section].first && layer <= minMaxLayerId[i_section].second)
+        return i_section;
+    }
+    dd4hep::printout(dd4hep::ERROR, "FCCSWHCalPhiRow_k4geo",
+                         "Wrong layer number %d! Can not convert to section number!", layer);
+    return 0;
   }
 
   /// Get the min and max layer indexes for each part of the HCal
