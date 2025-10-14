@@ -52,7 +52,7 @@
 
   <readouts>
     <!-- Default readout of DetailedWedge geometry -->
-    <readout name="HCalEndcapReadoutPhiThera">
+    <readout name="HCalEndcapReadoutPhiTheta">
       <!-- Description of the variables:
            detLayout - variable to determine if it's a Barrel(=0) or Endcap(=1).
            offset_z - takes three numbers: middle position in z of each section of the Endcap.

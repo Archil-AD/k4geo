@@ -28,21 +28,23 @@ namespace DDSegmentation {
     registerParameter("offset_r", "Offset in radius of the layer (Rmin)", m_offsetR, std::vector<double>());
     registerParameter("numLayers", "Number of layers", m_numLayers, std::vector<int>());
     registerParameter("dRlayer", "dR of the layer", m_dRlayer, std::vector<double>());
+    registerParameter("grouped_rows", "Number of rows combined in a pseudo-layer", m_groupedRows, std::vector<int>());
     registerIdentifier("identifier_phi", "Cell ID identifier for phi", m_phiID, "phi");
     registerIdentifier("identifier_row", "Cell ID identifier for row", m_rowID, "row");
     registerIdentifier("identifier_layer", "Cell ID identifier for layer", m_layerID, "layer");
     registerIdentifier("identifier_pseudoLayer", "Cell ID identifier for pseudo-layer", m_pseudoLayerID, "pseudoLayer");
 
     m_layerIndex = decoder()->index(m_layerID);
-    m_pseudoLayerIndex = decoder()->index(m_pseudoLayerID);
     m_rowIndex = decoder()->index(m_rowID);
     m_phiIndex = decoder()->index(m_phiID);
 
-    // Only endcap has "type" --- but it's too early to look at m_detLayout.
+    // Only endcap has "type" and "pseudoLayer" --- but it's too early to look at m_detLayout.
     for (const dd4hep::DDSegmentation::BitFieldElement& bfe : decoder()->fields()) {
       if (bfe.name() == "type") {
         m_typeIndex = decoder()->index("type");
-        break;
+      }
+      if (bfe.name() == m_pseudoLayerID) {
+        m_pseudoLayerIndex = decoder()->index(m_pseudoLayerID);
       }
     }
   }

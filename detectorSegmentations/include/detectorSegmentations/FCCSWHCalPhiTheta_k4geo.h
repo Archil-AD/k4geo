@@ -207,13 +207,30 @@ namespace DDSegmentation {
      */
     inline void setFieldNamePhi(const std::string& fieldName) { m_phiID = fieldName; }
 
-    /** Returns a std::vector<double> of the cellDimensions of the given cell ID
-     *  in natural order of dimensions (phi, theta)
+    /** Returns a std::vector<double> of the cellDimensions of the given cell ID as required by PandoraPFA
+     *  cellSize0: cell size along the z-axis
+     *  cellSize1: cell size along the axis perpendicular to cellSize0 and thickness
+     *  If the the cellID is zero then it returns the cell dimensions in phi and theta
      *  @param[in] cellID
-     *  return a std::vector of size 2 with the cellDimensions of the given cell ID (phi, theta)
+     *  return a std::vector of size 2 with the cellDimensions of the given cell ID (cellSize0, cellSize1)
      */
-    virtual std::vector<double> cellDimensions(const CellID& /* id */) const override {
-      return {gridSizePhi(), gridSizeTheta()};
+    virtual std::vector<double> cellDimensions(const CellID& cID) const override {
+      // if the cellID is not provided then return the cell dimensions in phi and theta
+      if(cID == 0) return {gridSizePhi(), gridSizeTheta()};
+
+      float cellSize0 = 0.;
+      float cellSize1 = 0.;
+      uint layer = decoder()->get(cID, m_layerIndex);
+      int thetaID = decoder()->get(cID, m_thetaIndex);
+
+      if (m_radii.empty())
+        defineCellsInRZplan();
+      if (!m_radii.empty())
+      {
+        cellSize0 = fabs(m_cellEdges[layer][thetaID].second - m_cellEdges[layer][thetaID].first);
+        cellSize1 = 2.* m_radii[layer] * std::sin(gridSizePhi()/2.);
+      }
+      return {cellSize0, cellSize1};
     }
 
   private:

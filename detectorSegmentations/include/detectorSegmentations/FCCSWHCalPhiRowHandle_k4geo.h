@@ -69,10 +69,10 @@ public:
   }
 
   /// access the grid size in row for each layer
-  inline std::vector<int> gridSizeRow() const { return access()->implementation->gridSizeRow(); }
+  inline const std::vector<int>& gridSizeRow() const { return access()->implementation->gridSizeRow(); }
 
   /// access the number of rows grouped in the pseudo-layers of the Endcap
-  inline std::vector<int> groupedRows() const { return access()->implementation->groupedRows(); }
+  inline const std::vector<int>& groupedRows() const { return access()->implementation->groupedRows(); }
 
   /// access the grid size in Phi
   inline int phiBins() const { return access()->implementation->phiBins(); }
