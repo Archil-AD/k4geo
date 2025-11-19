@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
+if( POLICY CMP0167 )
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 #---------------------------
 set( PackageName k4geo )
 #---------------------------
@@ -152,6 +156,13 @@ endif()
 
 #Create this_package.sh file, and install
 dd4hep_instantiate_package(${PackageName})
+if(EXISTS "${PROJECT_BINARY_DIR}/this${PackageName}.sh")
+  message(STATUS "this${PackageName}.sh created successfully.")
+  # Replace the K4GEO environment variable with the path to the source
+  file(APPEND "${PROJECT_BINARY_DIR}/this${PackageName}.sh" "\nexport K4GEO=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+else()
+  message(WARNING "this${PackageName}.sh was not created.")
+endif()
 
 add_subdirectory(detectorSegmentations)
 add_subdirectory(detectorCommon)
