@@ -62,6 +62,12 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
   // number of sequences fitting in Z
   unsigned int numSequencesZ = lcdd.constant<unsigned>("BarHCal_numSequencesZ");
 
+  // number of modules along phi
+  unsigned int numModules = lcdd.constant<unsigned>("BarHCal_n_phi_modules");
+
+  // spacing between modules
+  double moduleSpacing = lcdd.constant<double>("BarHCAL_module_spacing_phi");
+
   // get all 'layer' children of the 'layers' tag
   std::vector<xml_comp_t> Layers;
   for (xml_coll_t xCompColl(xmlDet.child(_Unicode(layers)), _Unicode(layer)); xCompColl; ++xCompColl) {
@@ -104,8 +110,10 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
 
   std::vector<dd4hep::PlacedVolume> layers;
   layers.reserve(layerDepths.size());
-  std::vector<std::vector<dd4hep::PlacedVolume>> seqInLayers;
-  seqInLayers.reserve(layerDepths.size());
+  std::vector<std::vector<dd4hep::PlacedVolume>> tileSeqTubesInLayers;
+  tileSeqTubesInLayers.reserve(layerDepths.size());
+  std::vector<std::vector<dd4hep::PlacedVolume>> seqInTileSeqTube;
+  seqInTileSeqTube.reserve(layerDepths.size());
   std::vector<dd4hep::PlacedVolume> tilesPerLayer;
   tilesPerLayer.reserve(layerDepths.size());
 
@@ -148,8 +156,6 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
   DetElement support(caloDetElem, "HCalSteelSupport", 0);
   support.setPlacement(placedSupport);
 
-  //  double sensitiveBarrelDz = dzDetector - dZEndPlate;
-
   // loop over R ("layers")
   double layerR = 0.;
   for (unsigned int idxLayer = 0; idxLayer < layerDepths.size(); ++idxLayer) {
@@ -163,64 +169,99 @@ static dd4hep::Ref_t createHCal(dd4hep::Detector& lcdd, xml_det_t xmlDet, dd4hep
     dd4hep::printout(dd4hep::INFO, "HCalTileBarrel_o1_v02", "layer %d (cm): %.2f - %.2f", idxLayer, rminLayer,
                      rmaxLayer);
 
-    // alternate: even layers consist of tile sequence b, odd layer of tile sequence a
+    // alternate: even layers in first module consist of tile sequence b, odd layer of tile sequence a
     unsigned int sequenceIdx = idxLayer % 2;
 
+    // create a tube volume for wedge shape tile sequences
     dd4hep::Tube tileSequenceShape(rminLayer, rmaxLayer, 0.5 * dzSequence);
     Volume tileSequenceVolume("HCalTileSequenceVol", tileSequenceShape, lcdd.air());
 
+    // create a volume for a single wedge shape sequence of type a and b
+    double phi_min = 0.0;
+    double phi_max = 2. * M_PI / numModules;
+    dd4hep::ConeSegment sequenceShape(0.5 * dzSequence, rminLayer, rmaxLayer, rminLayer, rmaxLayer,
+                                            phi_min, phi_max);
+    std::array<Volume,2> sequenceVol;
+    for(unsigned int iseq=0; iseq < 2; iseq++){
+      sequenceVol[iseq] = Volume("HCalSeqVol", sequenceShape, lcdd.air());
+      sequenceVol[iseq].setVisAttributes(lcdd.invisible());
+    }
+
+    // create a layer volume
     dd4hep::Tube layerShape(rminLayer, rmaxLayer, dzDetector - dZEndPlate - space);
     Volume layerVolume("HCalLayerVol", layerShape, lcdd.air());
-
     layerVolume.setVisAttributes(lcdd.invisible());
-
     dd4hep::PlacedVolume placedLayerVolume = envelopeVolume.placeVolume(layerVolume);
     placedLayerVolume.addPhysVolID("layer", idxLayer);
     layers.push_back(placedLayerVolume);
 
-    double tileZOffset = -0.5 * dzSequence;
-    // first Z loop (tiles that make up a sequence)
-    for (xml_coll_t xCompColl(sequences[sequenceIdx], _Unicode(module_component)); xCompColl; ++xCompColl) {
-      xml_comp_t xComp = xCompColl;
-      dd4hep::Tube tileShape(rminLayer, rmaxLayer, 0.5 * xComp.thickness());
+    // place tiles in sequence_a and sequence_b volumes
+    for(unsigned int iseq=0; iseq < 2; iseq++)
+    {
+      double tileZOffset = -0.5 * dzSequence;
+      for (xml_coll_t xCompColl(sequences[iseq], _Unicode(module_component)); xCompColl; ++xCompColl) {
+        xml_comp_t xComp = xCompColl;
+        double phi1 = phi_min;
+        double phi2 = phi_max;
 
-      Volume tileVol("HCalTileVol_" + xComp.nameStr(), tileShape, lcdd.material(xComp.materialStr()));
-      tileVol.setVisAttributes(lcdd, xComp.visStr());
+        // reduce tile size by moduleSpacing size from both sides
+        phi1 = asin(moduleSpacing/rminLayer);
+        phi2 = phi2 - phi1;
 
-      dd4hep::Position tileOffset(0, 0, tileZOffset + 0.5 * xComp.thickness());
-      dd4hep::PlacedVolume placedTileVol = tileSequenceVolume.placeVolume(tileVol, tileOffset);
-
-      if (xComp.isSensitive()) {
-        tileVol.setSensitiveDetector(sensDet);
-        tilesPerLayer.push_back(placedTileVol);
+        dd4hep::ConeSegment tileShape(0.5 * xComp.thickness(), rminLayer, rmaxLayer, rminLayer, rmaxLayer,
+                                            phi1, phi2);
+        Volume tileVol("HCalTileVol_" + xComp.nameStr(), tileShape, lcdd.material(xComp.materialStr()));
+        tileVol.setVisAttributes(lcdd, xComp.visStr());
+        if (xComp.isSensitive()) {
+          tileVol.setSensitiveDetector(sensDet);
+        }
+        dd4hep::Position tileOffset( 0., 0., tileZOffset + 0.5 * xComp.thickness());
+        PlacedVolume placedTileVol = sequenceVol[iseq].placeVolume(tileVol, tileOffset);
+        tileZOffset += xComp.thickness();
       }
-      tileZOffset += xComp.thickness();
     }
 
+    std::vector<dd4hep::PlacedVolume> sequence_vector;
+
+    // place numModules=256 tile sequences into tube shape tileSequenceVolume
+    for (unsigned int iWedge = 0; iWedge < numModules; ++iWedge) {
+      double phi_angle = iWedge * (2. * M_PI / numModules);
+      dd4hep::Transform3D transform(dd4hep::RotationZ(phi_angle), dd4hep::Position(0.,0.,0.));
+      unsigned int iseq = 0;
+      if(sequenceIdx==0) iseq = iWedge % 2;
+      if(sequenceIdx==1) iseq = 1 - (iWedge % 2);
+      PlacedVolume placedSequenceVol = tileSequenceVolume.placeVolume(sequenceVol[iseq], iWedge, transform);
+      placedSequenceVol.addPhysVolID("phi", iWedge);
+      sequence_vector.push_back(placedSequenceVol);
+    }
+    seqInTileSeqTube.push_back(sequence_vector);
+
     // second z loop (place sequences in layer)
-    std::vector<dd4hep::PlacedVolume> sq_vector;
+    std::vector<dd4hep::PlacedVolume> tileSequence_vector;
 
     for (uint numSeq = 0; numSeq < numSequencesZ; numSeq++) {
       double zOffset = -dzDetector + numSeq * dzSequence + dzSequence / 2 + dZEndPlate + space;
       dd4hep::Position tileSequencePosition(0, 0, zOffset);
       dd4hep::PlacedVolume placedTileSequenceVolume = layerVolume.placeVolume(tileSequenceVolume, tileSequencePosition);
       placedTileSequenceVolume.addPhysVolID("row", numSeq);
-      sq_vector.push_back(placedTileSequenceVolume);
+      tileSequence_vector.push_back(placedTileSequenceVolume);
     }
-    seqInLayers.push_back(sq_vector);
+    tileSeqTubesInLayers.push_back(tileSequence_vector);
   }
 
-  // Place det elements wihtin each other to recover volume positions later via cellID
+  // Place det elements within each other to recover volume positions later via cellID
   for (uint iLayer = 0; iLayer < numLayersR; iLayer++) {
     DetElement layerDet(caloDetElem, dd4hep::xml::_toString(iLayer, "layer%d"), iLayer);
     layerDet.setPlacement(layers[iLayer]);
 
-    for (uint iSeq = 0; iSeq < seqInLayers[iLayer].size(); iSeq++) {
-      DetElement seqDet(layerDet, dd4hep::xml::_toString(iSeq, "seq%d"), iSeq);
-      seqDet.setPlacement(seqInLayers[iLayer][iSeq]);
+    for (uint iSeqTube = 0; iSeqTube < tileSeqTubesInLayers[iLayer].size(); iSeqTube++) {
+      DetElement tileSeqTubeDet(layerDet, dd4hep::xml::_toString(iSeqTube, "tileSeqTube%d"), iSeqTube);
+      tileSeqTubeDet.setPlacement(tileSeqTubesInLayers[iLayer][iSeqTube]);
 
-      DetElement tileDet(seqDet, dd4hep::xml::_toString(iSeq, "tile%d"), iSeq);
-      tileDet.setPlacement(tilesPerLayer[iLayer]);
+      for (uint iSeq = 0; iSeq < seqInTileSeqTube[iLayer].size(); iSeq++) {
+        DetElement seqDet(tileSeqTubeDet, dd4hep::xml::_toString(iSeq, "tileSeq%d"), iSeq);
+        seqDet.setPlacement(seqInTileSeqTube[iLayer][iSeq]);
+      }
     }
   }
 

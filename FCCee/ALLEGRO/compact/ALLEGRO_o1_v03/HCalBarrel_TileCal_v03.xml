@@ -12,7 +12,7 @@
     <!-- dimensions in R / rho of actual detector modules (face-plate is placed inside)-->
     <!-- tile dimensions -->
     <constant name="BarHCal_n_phi_modules" value="256"/>
-    <constant name="BarHCAL_module_spacing_phi" value="1*mm"/>
+    <constant name="BarHCAL_module_spacing_phi" value="0*mm"/>
     <!-- component dimensions -->
     <constant name="BarHCal_master_plate_thickness" value="5*mm" />
     <constant name="BarHCal_spacer_plate_thickness" value="4*mm" />
