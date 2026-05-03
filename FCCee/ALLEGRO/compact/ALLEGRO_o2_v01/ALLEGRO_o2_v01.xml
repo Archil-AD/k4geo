@@ -41,9 +41,9 @@
   <world material="Vacuum"/> -->
 
   <include ref="../ALLEGRO_o1_v03/LumiCal.xml"/>
-  <include ref="../ALLEGRO_o1_v03/VertexComplete_IDEA_o1_v03.xml"/> 
+  <include ref="../../../IDEA/compact/IDEA_o1_v04/VertexComplete_o1_v04.xml"/>
   <include ref="StrawTubeTracker_o1_v01.xml"/>
-  <include ref="../ALLEGRO_o1_v03/SiliconWrapper_o1_v03.xml"/> 
+  <include ref="../../../IDEA/compact/IDEA_o1_v04/SiliconWrapper_o1_v02.xml"/>
   <include ref="../ALLEGRO_o1_v03/ECalBarrel_thetamodulemerged.xml"/> <!-- Caution: removing the ECAL barrel also removes the magnetic field! The solenoid is hosted in the ECAL barrel cryostat and therefore the B-field is defined there -->
   <include ref="../ALLEGRO_o1_v03/HCalBarrel_TileCal_v03.xml"/>
   <include ref="../ALLEGRO_o1_v03/ECalEndcaps_Turbine_o1_v03.xml"/>
